@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>純代碼版 - 水果盤抽籤機</title>
+    <style>
+        /* --- 基礎樣式 --- */
+        @import url('https://fonts.googleapis.com/css2?family=Bungee+Spice&family=Noto+Sans+TC:wght@900&display=swap');
+
+        :root {
+            --gold: #ffd700;
+            --dark-red: #8b0000;
+            --neon-red: #ff3131;
+            --bg-dark: #1a1a1a;
+            --panel-bg: #111;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-dark);
+            font-family: 'Noto Sans TC', sans-serif;
+            color: white;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* --- 標題與版面布局 --- */
+        .neon-title {
+            font-size: clamp(2rem, 8vw, 4rem);
+            margin-bottom: 30px;
+            color: #fff;
+            text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px var(--neon-red), 0 0 30px var(--neon-red);
+            font-family: 'Bungee Spice', cursive;
+            text-align: center;
+            letter-spacing: 5px;
+        }
+
+        .main-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            width: 100%;
+            max-width: 1100px;
+            justify-content: center;
+        }
+
+        /* --- 左側控制台 --- */
+        .control-panel {
+            flex: 1;
+            min-width: 300px;
+            background: #222;
+            padding: 25px;
+            border-radius: 25px;
+            border: 4px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .control-panel h2 {
+            color: var(--gold);
+            margin-top: 0;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        select, textarea {
+            width: 100%;
+            background: #111;
+            border: 2px solid #444;
+            color: var(--gold);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        select:focus, textarea:focus { border-color: var(--gold); }
+
+        textarea { height: 250px; resize: none; font-family: inherit; }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        #resetBtn {
+            background: #600;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        #resetBtn:hover {
+            background: #a00;
+        }
+
+        /* --- 右側老虎機 --- */
+        .slot-section {
+            flex: 1.5;
+            min-width: 320px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .slot-machine {
+            background: linear-gradient(180deg, #444 0%, #222 100%);
+            border: 8px solid #555;
+            border-radius: 40px;
+            padding: 30px;
+            width: 100%;
+            max-width: 450px;
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        }
+
+        .slot-windows {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            background: #000;
+            padding: 10px;
+            border-radius: 15px;
+            border: 3px solid var(--gold);
+        }
+
+        .window {
+            height: 120px;
+            background: #111;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .reel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform: translateY(0);
+        }
+
+        .slot-item {
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            width: 100%;
+            border-bottom: 1px solid #222;
+        }
+
+        .winner-glow {
+            animation: glow 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 5px var(--gold); border-color: var(--gold); }
+            to { box-shadow: 0 0 20px var(--gold); border-color: #fff; }
+        }
+
+        /* --- 按鈕與拉桿 --- */
+        .spin-btn {
+            margin-top: 30px;
+            background: linear-gradient(to bottom, #ffd700, #b8860b);
+            color: #800;
+            border: none;
+            padding: 15px 50px;
+            border-radius: 50px;
+            font-size: 1.8rem;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #8a6d00;
+            transition: all 0.1s;
+            text-transform: uppercase;
+        }
+
+        .spin-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #8a6d00;
+        }
+
+        .spin-btn:disabled {
+            background: #555;
+            color: #888;
+            box-shadow: none;
+            transform: translateY(4px);
+            cursor: not-allowed;
+        }
+
+        /* --- 拉桿樣式 --- */
+        .lever-container {
+            position: absolute;
+            right: -35px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none; 
+        }
+
+        @media (min-width: 768px) { .lever-container { display: block; } }
+
+        .lever-base { width: 15px; height: 100px; background: #666; border-radius: 10px; position: relative; }
+        .lever-handle {
+            width: 15px; height: 80px; background: linear-gradient(90deg, #999, #eee, #999);
+            position: absolute; bottom: 10px; left: 0;
+            transform-origin: bottom center; transition: transform 0.5s; cursor: pointer;
+        }
+        .lever-ball {
+            width: 35px; height: 35px; background: #d00; border-radius: 50%;
+            position: absolute; top: -30px; left: -10px; box-shadow: 0 5px 10px rgba(0,0,0,0.5);
+        }
+        .lever-pull { transform: rotateX(160deg); }
+
+        /* --- 結果顯示與 AI --- */
+        .result-area {
+            margin-top: 30px;
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+
+        #resultDisplay {
+            opacity: 0;
+            transform: scale(0.5);
+            transition: 0.5s;
+        }
+
+        .winner-name {
+            font-size: 4rem;
+            font-weight: 900;
+            display: block;
+            margin: 10px 0;
+            text-decoration: underline;
+        }
+
+        .ai-btn {
+            background: linear-gradient(90deg, #6366f1, #a855f7);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            display: none;
+            animation: sparkle 1.5s infinite;
+        }
+
+        @keyframes sparkle {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); opacity: 0.9; }
+        }
+
+        .ai-card {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 20px;
+            padding: 20px;
+            margin-top: 15px;
+            display: none;
+            font-style: italic;
+            line-height: 1.6;
+        }
+
+        /* --- 音效控制開關 --- */
+        .audio-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.6);
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid #555;
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        .loading-spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+            display: none;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="audio-toggle" id="audioToggle">
+        <span id="audioLabel" style="font-size: 12px; color: #aaa;">音效已關閉</span>
+        <span id="audioIcon">🔇</span>
+    </div>
+
+    <h1 class="neon-title">NAME SLOT</h1>
+
+    <div class="main-container">
+        
+        <!-- 左側：控制台 -->
+        <div class="control-panel">
+            <h2>📋 抽籤名冊</h2>
+            
+            <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">快速載入班級：</label>
+            <select id="classSelect">
+                <option value="">-- 自定義名單 (清除) --</option>
+                <option value="electric1A">電機一甲</option>
+                <option value="dataProcess2A">資處二甲</option>
+                <option value="dataProcess3A">資處三甲</option>
+                <option value="interiorDesign3A">室設三甲</option>
+                <option value="architecture3A">建築三甲</option>
+                <option value="business2A">商經二甲</option>
+                <option value="business3A">商經三甲</option>
+            </select>
+
+            <textarea id="nameInput" placeholder="請在此輸入名單，每行一個名字..."></textarea>
+            
+            <div class="info-row">
+                <span>目前人數：<strong id="countNum">0</strong></span>
+                <button id="resetBtn">全機重設</button>
+            </div>
+        </div>
+
+        <!-- 右側：老虎機本體 -->
+        <div class="slot-section">
+            <div class="slot-machine">
+                <div class="slot-windows">
+                    <div class="window"><div class="reel" id="reel1"></div></div>
+                    <div class="window"><div class="reel" id="reel2"></div></div>
+                    <div class="window"><div class="reel" id="reel3"></div></div>
+                </div>
+
+                <!-- 拉桿 -->
+                <div class="lever-container">
+                    <div class="lever-base">
+                        <div class="lever-handle" id="lever">
+                            <div class="lever-ball"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="spin-btn" id="spinBtn">SPIN!</button>
+
+            <!-- 結果與 AI -->
+            <div class="result-area">
+                <div id="resultDisplay">
+                    <p style="color: var(--gold); font-weight: bold; margin: 0;">🎉 恭喜中獎 🎉</p>
+                    <span class="winner-name" id="winnerName">---</span>
+                </div>
+
+                <button class="ai-btn" id="aiBtn">✨ 讓 AI 分析這位幸運兒</button>
+
+                <div class="ai-card" id="aiCard">
+                    <div class="loading-spinner" id="aiLoading"></div>
+                    <div id="aiText"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 學生資料庫 ---
+        const studentData = {
+            electric1A: "李安順\n李翌淳\n周岳勳\n林志忠\n林承毅\n林彥呈\n林渝菖\n林鴻鈞\n柯富宏\n洪思賢\n洪煥庭\n張韋盛\n莊琪文\n莊詠竣\n許立焱\n許勝幄\n許鈞程\n陳正杰\n陳政傑\n陳柏源\n黃柏翰\n黃竣瑋\n黃鉦瑋\n鄭子銘\n謝俊鉎\n鍾朋霖\n顏鈞鍀\n陳雋喆",
+            dataProcess2A: "石承右\n吳羿霈\n林妤恩\n許芳盛\n郭洧岑\n陳怡喬\n黃宜瑩\n黃俞萍\n黃鈺純\n楊茵淇\n楊鎮彥\n鄞挺勛",
+            dataProcess3A: "吳和興\n吳婉歆\n林禹賓\n曹巧薇\n許靚涵\n陳敬佑\n曾宜稚\n黃子晉\n楊鎔蔚\n詹于庭\n蔡婉筠\n謝芷妤\n謝碩諺\n顏玉琳\n陳品瑜",
+            interiorDesign3A: "李宛錡\n杜易陽\n林妤粢\n林函瑋\n林雨樂\n林晏妤\n邱若涵\n邱晨恩\n邱薪誠\n施柏丞\n洪子秦\n洪禹丞\n洪靜茹\n張家豪\n張謹玉\n莊玉雪\n許傑樂\n陳司幼\n陳宇賢\n陳星伝\n陳靜愉\n黃香涵\n黃郡毅\n黃湘婷\n詹品威\n楊采諠\n詹芷欣\n謝宜蓁\n顏鈺勝\n蔡承祥",
+            architecture3A: "江政諺\n巫偉群\n林筱琪\n洪千淯\n洪振維\n洪偉智\n洪翊芳\n張妤\n張志煒\n莊育真\n莊芯宜\n許修豪\n陳姿均\n陳星宇\n黃千廑\n雲照賢\n黃柏豪\n楊宗固\n楊鈺翔\n葉芷彤\n詹子右\n歐婷榕\n蔡采諭\n賴品諺",
+            business2A: "吳耘昌\n林祐緯\n林婉柔\n洪柏軒\n洪婉婷\n張宜芳\n曹育愷\n陳士弦\n陳秋伶\n蔡昕凱\n蔡景荃\n黎哲成\n謝承峻\n謝承泰\n陳竑碩\n紀冠宇\n蔡佳佑",
+            business3A: "康定富\n陳宜均\n詹茗菖\n廖謝祥\n蔡怡萱\n盧信溢\n謝有均\n謝豐安\n康定澤\n洪敏芸\n王櫻綺\n高妤軒\n陳唯安"
+        };
+
+        // --- 2. 變數與 DOM 初始化 ---
+        const apiKey = ""; 
+        const nameInput = document.getElementById('nameInput');
+        const countNum = document.getElementById('countNum');
+        const classSelect = document.getElementById('classSelect');
+        const spinBtn = document.getElementById('spinBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const lever = document.getElementById('lever');
+        const reels = [document.getElementById('reel1'), document.getElementById('reel2'), document.getElementById('reel3')];
+        const winnerName = document.getElementById('winnerName');
+        const resultDisplay = document.getElementById('resultDisplay');
+        const aiBtn = document.getElementById('aiBtn');
+        const aiCard = document.getElementById('aiCard');
+        const aiText = document.getElementById('aiText');
+        const aiLoading = document.getElementById('aiLoading');
+        const audioToggle = document.getElementById('audioToggle');
+
+        const FRUITS = ['🍎', '🍋', '🍒', '🍇', '🍉', '🍓', '🍍', '🔔', '7️⃣'];
+        let isSpinning = false;
+        let audioEnabled = false;
+        let audioCtx;
+
+        // --- 3. 音效系統 ---
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(freq, type, duration, vol = 0.1) {
+            if (!audioEnabled || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        audioToggle.addEventListener('click', () => {
+            initAudio();
+            audioEnabled = !audioEnabled;
+            document.getElementById('audioIcon').innerText = audioEnabled ? '🔊' : '🔇';
+            document.getElementById('audioLabel').innerText = audioEnabled ? '音效已開啟' : '音效已關閉';
+            if (audioEnabled && audioCtx.state === 'suspended') audioCtx.resume();
+        });
+
+        // --- 4. 名單與介面控制 ---
+        function updateCount() {
+            const lines = nameInput.value.split('\n').filter(l => l.trim() !== "");
+            countNum.innerText = lines.length;
+        }
+
+        // 僅重設機台外觀 (不影響名單)
+        function resetMachineVisuals() {
+            reels.forEach(r => {
+                r.style.transition = 'none';
+                r.style.transform = 'translateY(0)';
+                r.innerHTML = '<div class="slot-item">?</div>';
+            });
+            resultDisplay.style.opacity = '0';
+            resultDisplay.style.transform = 'scale(0.5)';
+            aiBtn.style.display = 'none';
+            aiCard.style.display = 'none';
+            document.querySelectorAll('.window').forEach(w => w.classList.remove('winner-glow'));
+            reels[0].offsetHeight; // Trigger reflow
+        }
+
+        // --- 事件：快速載入班級 ---
+        classSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val === "") {
+                nameInput.value = "";
+            } else if (studentData[val]) {
+                nameInput.value = studentData[val];
+            }
+            updateCount();
+            resetMachineVisuals();
+        });
+
+        // --- 事件：點擊「全機重設」按鈕 ---
+        resetBtn.addEventListener('click', () => {
+            nameInput.value = ""; // 清空文字區域
+            classSelect.value = ""; // 回到預設選單
+            winnerName.innerText = "---"; // 清除中獎人文字
+            updateCount(); // 更新計數為 0
+            resetMachineVisuals(); // 重設轉輪與動畫效果
+            playSound(100, 'sine', 0.2, 0.1);
+        });
+
+        nameInput.addEventListener('input', updateCount);
+
+        // --- 5. 轉動邏輯 ---
+        async function spin() {
+            if (isSpinning) return;
+            const names = nameInput.value.split('\n').filter(l => l.trim() !== "");
+            if (names.length === 0) return;
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            
+            // 每次轉動前確保視覺重設
+            resetMachineVisuals();
+            initAudio();
+
+            // 拉桿動畫
+            lever.classList.add('lever-pull');
+            playSound(150, 'sine', 0.3, 0.2);
+            setTimeout(() => lever.classList.remove('lever-pull'), 500);
+
+            const luckyName = names[Math.floor(Math.random() * names.length)];
+            const parts = [
+                luckyName[0] || '?',
+                luckyName[1] || '✨',
+                luckyName[2] || '💎'
+            ];
+
+            const reelLength = 30; 
+            
+            reels.forEach((reel, i) => {
+                let html = '';
+                // 填充隨機水果
+                for(let j=0; j<reelLength; j++) {
+                    const fruit = FRUITS[Math.floor(Math.random() * FRUITS.length)];
+                    html += `<div class="slot-item">${fruit}</div>`;
+                }
+                // 最後放中獎字
+                html += `<div class="slot-item" style="color:var(--gold)">${parts[i]}</div>`;
+                reel.innerHTML = html;
+
+                // 強制重繪
+                reel.offsetHeight;
+
+                // 觸發動畫
+                setTimeout(() => {
+                    reel.style.transition = `transform ${2.5 + i * 0.8}s cubic-bezier(0.1, 0, 0.1, 1)`;
+                    reel.style.transform = `translateY(-${reelLength * 120}px)`;
+                    
+                    // 模擬滾動音效
+                    let soundCount = 0;
+                    const interval = setInterval(() => {
+                        if (soundCount > 20) {
+                            clearInterval(interval);
+                            playSound(200, 'triangle', 0.2, 0.05);
+                        } else {
+                            playSound(400 + Math.random()*200, 'square', 0.03, 0.01);
+                            soundCount++;
+                        }
+                    }, 100);
+                }, i * 150);
+            });
+
+            setTimeout(() => {
+                isSpinning = false;
+                spinBtn.disabled = false;
+                winnerName.innerText = luckyName;
+                resultDisplay.style.opacity = '1';
+                resultDisplay.style.transform = 'scale(1)';
+                aiBtn.style.display = 'inline-block';
+                document.querySelectorAll('.window').forEach(w => w.classList.add('winner-glow'));
+                
+                // 結束音效
+                [523, 659, 783, 1046].forEach((f, idx) => {
+                    setTimeout(() => playSound(f, 'sine', 0.5, 0.15), idx * 120);
+                });
+            }, 5500);
+        }
+
+        spinBtn.addEventListener('click', spin);
+        lever.addEventListener('click', spin);
+
+        // --- 6. AI 分析功能 ---
+        async function fetchAI(name) {
+            aiCard.style.display = 'block';
+            aiLoading.style.display = 'block';
+            aiText.innerText = "";
+
+            const prompt = `你是一位充滿能量的老虎機大師。請針對抽中名字為「${name}」的學生，寫一段30字內的極短幽默評論，內容關於他的好運或性格。請用繁體中文。`;
+            
+            let retries = 0;
+            const maxRetries = 5;
+
+            async function callApi() {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            systemInstruction: { parts: [{ text: "你說話幽默風趣，像賭場主持人。" }] }
+                        })
+                    });
+                    const data = await response.json();
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "AI 正在休息，但你今天運勢超強！";
+                    aiLoading.style.display = 'none';
+                    aiText.innerText = text;
+                } catch (e) {
+                    if (retries < maxRetries) {
+                        retries++;
+                        const delay = Math.pow(2, retries) * 1000;
+                        setTimeout(callApi, delay);
+                    } else {
+                        aiLoading.style.display = 'none';
+                        aiText.innerText = "連線失敗，但你的運氣是無價的！";
+                    }
+                }
+            }
+            callApi();
+        }
+
+        aiBtn.addEventListener('click', () => fetchAI(winnerName.innerText));
+
+        // 初始設定
+        updateCount();
+        resetMachineVisuals();
+    </script>
+</body>
+</html>
