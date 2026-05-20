@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>四種進制機械翻轉計數器</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --panel: #1f2937;
+      --panel-soft: #273449;
+      --text: #f9fafb;
+      --muted: #a7b0c0;
+      --accent: #38bdf8;
+      --accent-2: #22c55e;
+      --danger: #f97316;
+      --wheel-bg: #080b12;
+      --wheel-edge: #374151;
+      --digit-top: #151b28;
+      --digit-bottom: #0b1020;
+      --digit-line: rgba(255,255,255,0.12);
+      --shadow: rgba(0,0,0,0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(56,189,248,0.18), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(34,197,94,0.13), transparent 30rem),
+        var(--bg);
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 56px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.8rem, 4vw, 3.2rem);
+      letter-spacing: 0.03em;
+    }
+
+    .subtitle {
+      margin: 0 auto;
+      max-width: 760px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .dashboard {
+      background: linear-gradient(180deg, rgba(31,41,55,0.96), rgba(17,24,39,0.96));
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      box-shadow: 0 24px 60px var(--shadow);
+      padding: 22px;
+      margin-bottom: 26px;
+    }
+
+    .settings {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      color: var(--muted);
+      font-weight: 650;
+      margin-bottom: 8px;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      appearance: textfield;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      background: #0b1020;
+      color: var(--text);
+      font-size: 1.15rem;
+      padding: 14px 16px;
+      outline: none;
+    }
+
+    input[type="number"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(56,189,248,0.18);
+    }
+
+    .current-readout {
+      min-width: 210px;
+      border-radius: 16px;
+      padding: 13px 16px;
+      background: var(--panel-soft);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .current-readout strong {
+      display: block;
+      color: var(--text);
+      font-size: 1.45rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      background: #334155;
+      color: var(--text);
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: transform 160ms ease, background 160ms ease, opacity 160ms ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      background: #475569;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .play { background: var(--accent-2); color: #052e16; }
+    .pause { background: var(--danger); color: #431407; }
+    .reset { background: #64748b; }
+
+    .counter-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .counter-card.binary-card {
+      grid-column: 1 / -1;
+    }
+
+    .binary-card .odometer {
+      justify-content: center;
+    }
+
+    .counter-card {
+      background: rgba(15,23,42,0.78);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 22px;
+      padding: 18px;
+      min-width: 0;
+    }
+
+    .counter-card h2 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      color: #e5e7eb;
+    }
+
+    .counter-card .hint {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .odometer {
+      display: flex;
+      gap: 7px;
+      justify-content: center;
+      align-items: center;
+      padding: 14px 10px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #050814, #111827 46%, #050814);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), inset 0 12px 24px rgba(0,0,0,0.55);
+      overflow-x: auto;
+    }
+
+    /*
+      CSS 3D 核心：
+      每個 .wheel 都是一個具有 perspective 的獨立滾輪。
+      .digit-card 以 transform-style: preserve-3d 保留上下兩面的 3D 空間。
+      JavaScript 只負責更新文字與加上 forward/backward class，真正的 rotateX 動畫由 CSS transition 完成。
+    */
+    .wheel {
+      position: relative;
+      width: clamp(28px, 4.6vw, 44px);
+      height: clamp(44px, 7vw, 66px);
+      flex: 0 0 auto;
+      perspective: 680px;
+      border-radius: 10px;
+      background: var(--wheel-bg);
+      box-shadow:
+        inset 0 0 0 1px var(--wheel-edge),
+        0 8px 18px rgba(0,0,0,0.38);
+      overflow: hidden;
+    }
+
+    .wheel::before,
+    .wheel::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .wheel::before {
+      top: 0;
+      height: 50%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.09), transparent 62%);
+    }
+
+    .wheel::after {
+      top: 50%;
+      border-top: 1px solid var(--digit-line);
+      box-shadow: 0 -1px 0 rgba(0,0,0,0.65), 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .digit-static,
+    .digit-card,
+    .digit-face {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: clamp(1.45rem, 4vw, 2.55rem);
+      font-weight: 900;
+      line-height: 1;
+      backface-visibility: hidden;
+    }
+
+    .digit-static {
+      color: rgba(249,250,251,0.86);
+      background: linear-gradient(180deg, var(--digit-top) 0 50%, var(--digit-bottom) 50% 100%);
+      text-shadow: 0 2px 3px rgba(0,0,0,0.75);
+    }
+
+    .digit-card {
+      z-index: 3;
+      transform-style: preserve-3d;
+      transition: transform 420ms cubic-bezier(.2,.8,.2,1);
+    }
+
+    .digit-face {
+      color: white;
+      text-shadow: 0 2px 3px rgba(0,0,0,0.85);
+      background: linear-gradient(180deg, #1f2937 0 50%, #0b1020 50% 100%);
+    }
+
+    .digit-face.back {
+      transform: rotateX(180deg);
+    }
+
+    .wheel.forward .digit-card {
+      transform: rotateX(-180deg);
+    }
+
+    .wheel.backward .digit-card {
+      transform: rotateX(180deg);
+    }
+
+    .wheel.changed {
+      outline: 2px solid rgba(56,189,248,0.38);
+      outline-offset: -2px;
+    }
+
+    .status {
+      margin-top: 16px;
+      min-height: 1.5em;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .counter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 620px) {
+      main {
+        width: min(100% - 20px, 1180px);
+        padding-top: 24px;
+      }
+
+      .settings {
+        grid-template-columns: 1fr;
+      }
+
+      .counter-grid {
+        grid-template-columns: 1fr;
+      }
+
+      button {
+        flex: 1 1 140px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>四種進制機械翻轉計數器</h1>
+      <p class="subtitle">輸入 0 到 255 的目標值，觀察十進制、十六進制、八進制與二進制如何同步進位與退位。</p>
+    </header>
+
+    <section class="dashboard" aria-label="控制面板">
+      <div class="settings">
+        <div>
+          <label for="targetInput">目標十進制數字（0–255）</label>
+          <input id="targetInput" type="number" min="0" max="255" value="42" inputmode="numeric" />
+        </div>
+        <div class="current-readout" aria-live="polite">
+          目前十進制值
+          <strong id="currentValue">0</strong>
+        </div>
+      </div>
+
+      <div class="controls" aria-label="播放控制">
+        <button id="playBtn" class="play" type="button">播放 Play</button>
+        <button id="pauseBtn" class="pause" type="button">暫停 Pause</button>
+        <button id="forwardBtn" type="button">前進一格 +1</button>
+        <button id="backwardBtn" type="button">退後一格 -1</button>
+        <button id="resetBtn" class="reset" type="button">重設 Reset</button>
+      </div>
+
+      <p id="status" class="status" aria-live="polite">準備開始。</p>
+    </section>
+
+    <section class="counter-grid" aria-label="四種進制計數器">
+      <article class="counter-card">
+        <h2>十進制 Base 10</h2>
+        <p class="hint">固定 3 位，可顯示 000–255。</p>
+        <div id="base10" class="odometer" aria-label="十進制計數器"></div>
+      </article>
+
+      <article class="counter-card">
+        <h2>十六進制 Base 16</h2>
+        <p class="hint">固定 2 位，可顯示 00–FF。</p>
+        <div id="base16" class="odometer" aria-label="十六進制計數器"></div>
+      </article>
+
+      <article class="counter-card">
+        <h2>八進制 Base 8</h2>
+        <p class="hint">固定 3 位，可顯示 000–377。</p>
+        <div id="base8" class="odometer" aria-label="八進制計數器"></div>
+      </article>
+
+      <article class="counter-card binary-card">
+        <h2>二進制 Base 2</h2>
+        <p class="hint">固定 8 位，使用前導零補齊。</p>
+        <div id="base2" class="odometer" aria-label="二進制計數器"></div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    /*
+      計數器設定：
+      maxDigits 是每種進制固定顯示的位數。
+      二進制依需求固定 8 位；其他進制足以容納 255。
+    */
+    const counters = [
+      { key: 'base10', base: 10, digits: 3, alphabet: '0123456789' },
+      { key: 'base16', base: 16, digits: 2, alphabet: '0123456789ABCDEF' },
+      { key: 'base8', base: 8, digits: 3, alphabet: '01234567' },
+      { key: 'base2', base: 2, digits: 8, alphabet: '01' }
+    ];
+
+    const state = {
+      current: 0,
+      target: 42,
+      timer: null,
+      playing: false,
+      // 儲存每個計數器上一輪格式化後的字串，用於判斷哪些輪需要翻轉。
+      previousStrings: new Map()
+    };
+
+    const targetInput = document.querySelector('#targetInput');
+    const currentValue = document.querySelector('#currentValue');
+    const statusText = document.querySelector('#status');
+    const playBtn = document.querySelector('#playBtn');
+    const pauseBtn = document.querySelector('#pauseBtn');
+    const forwardBtn = document.querySelector('#forwardBtn');
+    const backwardBtn = document.querySelector('#backwardBtn');
+    const resetBtn = document.querySelector('#resetBtn');
+
+    function clampTarget(value) {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isNaN(parsed)) return 0;
+      return Math.max(0, Math.min(255, parsed));
+    }
+
+    /*
+      進制轉換與格式化：
+      Number.toString(base) 產生目標進制，再轉大寫並 padStart 補足固定位數。
+    */
+    function formatValue(value, base, digits) {
+      return value.toString(base).toUpperCase().padStart(digits, '0');
+    }
+
+    function createWheel(initialChar) {
+      const wheel = document.createElement('span');
+      wheel.className = 'wheel';
+      wheel.setAttribute('aria-hidden', 'true');
+      wheel.innerHTML = `
+        <span class="digit-static">${initialChar}</span>
+        <span class="digit-card">
+          <span class="digit-face front">${initialChar}</span>
+          <span class="digit-face back">${initialChar}</span>
+        </span>
+      `;
+      return wheel;
+    }
+
+    function setupCounters() {
+      counters.forEach(config => {
+        const container = document.querySelector(`#${config.key}`);
+        const initial = formatValue(0, config.base, config.digits);
+        state.previousStrings.set(config.key, initial);
+        container.replaceChildren(...[...initial].map(createWheel));
+      });
+    }
+
+    /*
+      正反向動畫控制：
+      只有數字改變的滾輪會觸發動畫。
+      forward 使用 rotateX(-180deg)，backward 使用 rotateX(180deg)，讓進位與退位方向相反。
+      9→0、F→0、7→0、1→0 等進位/退位都會因字元改變而清楚翻轉。
+    */
+    function animateWheel(wheel, oldChar, newChar, direction) {
+      const staticDigit = wheel.querySelector('.digit-static');
+      const card = wheel.querySelector('.digit-card');
+      const front = wheel.querySelector('.front');
+      const back = wheel.querySelector('.back');
+
+      wheel.classList.remove('forward', 'backward', 'changed');
+      front.textContent = oldChar;
+      back.textContent = newChar;
+      staticDigit.textContent = oldChar;
+
+      // 強制瀏覽器套用動畫前狀態，避免連續步進時 transition 被合併。
+      void wheel.offsetWidth;
+
+      wheel.classList.add(direction, 'changed');
+
+      const finish = () => {
+        staticDigit.textContent = newChar;
+        front.textContent = newChar;
+        back.textContent = newChar;
+        card.style.transition = 'none';
+        wheel.classList.remove('forward', 'backward');
+        void wheel.offsetWidth;
+        card.style.transition = '';
+        window.setTimeout(() => wheel.classList.remove('changed'), 130);
+        card.removeEventListener('transitionend', finish);
+      };
+
+      card.addEventListener('transitionend', finish);
+    }
+
+    function render(direction = 'forward') {
+      currentValue.textContent = String(state.current);
+
+      counters.forEach(config => {
+        const container = document.querySelector(`#${config.key}`);
+        const previous = state.previousStrings.get(config.key);
+        const next = formatValue(state.current, config.base, config.digits);
+        const wheels = [...container.querySelectorAll('.wheel')];
+
+        [...next].forEach((char, index) => {
+          const oldChar = previous[index];
+          if (oldChar !== char) {
+            animateWheel(wheels[index], oldChar, char, direction);
+          }
+        });
+
+        container.setAttribute('aria-label', `${config.key} value ${next}`);
+        state.previousStrings.set(config.key, next);
+      });
+
+      updateButtons();
+    }
+
+    /*
+      狀態管理：
+      step(delta) 是播放、自動計數、手動前進與手動退後共用的核心。
+      delta > 0 代表正向翻轉；delta < 0 代表反向翻轉。
+    */
+    function step(delta) {
+      const next = Math.max(0, Math.min(255, state.current + delta));
+      if (next === state.current) return false;
+      state.current = next;
+      render(delta > 0 ? 'forward' : 'backward');
+      return true;
+    }
+
+    function syncTargetFromInput() {
+      state.target = clampTarget(targetInput.value);
+      targetInput.value = state.target;
+    }
+
+    function play() {
+      syncTargetFromInput();
+
+      if (state.current >= state.target) {
+        pause('目前值已達到或超過目標值。可按 Reset 後重新播放。');
+        return;
+      }
+
+      state.playing = true;
+      statusText.textContent = `播放中：從 ${state.current} 數到 ${state.target}。`;
+      updateButtons();
+
+      clearInterval(state.timer);
+      state.timer = setInterval(() => {
+        if (state.current >= state.target) {
+          pause('已抵達目標值。');
+          return;
+        }
+        step(1);
+      }, 380); // 播放延遲介於需求的 300–500ms 之間。
+    }
+
+    function pause(message = '已暫停。') {
+      clearInterval(state.timer);
+      state.timer = null;
+      state.playing = false;
+      statusText.textContent = message;
+      updateButtons();
+    }
+
+    function reset() {
+      pause('已重設為 0。');
+      state.current = 0;
+      render('backward');
+    }
+
+    function updateButtons() {
+      playBtn.disabled = state.playing || state.current >= state.target;
+      pauseBtn.disabled = !state.playing;
+      forwardBtn.disabled = state.playing || state.current >= 255;
+      backwardBtn.disabled = state.playing || state.current <= 0;
+      resetBtn.disabled = state.playing || state.current === 0;
+    }
+
+    targetInput.addEventListener('change', () => {
+      syncTargetFromInput();
+      statusText.textContent = `目標值已設定為 ${state.target}。`;
+      updateButtons();
+    });
+
+    targetInput.addEventListener('input', () => {
+      state.target = clampTarget(targetInput.value);
+      updateButtons();
+    });
+
+    playBtn.addEventListener('click', play);
+    pauseBtn.addEventListener('click', () => pause());
+    forwardBtn.addEventListener('click', () => {
+      pause('手動前進一格。');
+      if (step(1)) statusText.textContent = `已前進到 ${state.current}。`;
+    });
+    backwardBtn.addEventListener('click', () => {
+      pause('手動退後一格。');
+      if (step(-1)) statusText.textContent = `已退後到 ${state.current}。`;
+    });
+    resetBtn.addEventListener('click', reset);
+
+    setupCounters();
+    render('forward');
+  </script>
+</body>
+</html>
